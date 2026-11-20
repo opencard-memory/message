@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WLM Messenger</title>
+    <title>OpenCard Message</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
@@ -25,13 +25,16 @@
 </head>
 <body class="flex items-center justify-center min-h-screen p-2 md:p-4">
 
+    <!-- Toast Notifications -->
+    <div id="toastHost" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 w-[92vw] max-w-sm pointer-events-none" role="status" aria-live="polite"></div>
+
     <!-- Login/Signup Container -->
     <div id="authContainer" class="bg-white p-6 md:p-8 rounded-xl shadow-xl w-full max-w-sm border border-blue-100">
         <!-- Login Box -->
         <div class="box" id="loginBox">
             <div class="text-center mb-6">
-                <img src="https://upload.wikimedia.org/wikipedia/it/4/49/Windows_Live_Messenger_logo.png" alt="WLM Logo" class="w-44 mx-auto mb-2">
-                <h1 class="text-2xl font-bold text-gray-800">WLM Messenger</h1>
+                <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 flex items-center justify-center shadow" aria-hidden="true"><i class="fas fa-comments text-white text-3xl"></i></div>
+                <h1 class="text-2xl font-bold text-gray-800">OpenCard Message</h1>
                 <p class="text-xs text-gray-500 mt-1">로그인하여 대화를 시작하세요</p>
             </div>
             <div class="space-y-3">
@@ -54,9 +57,9 @@
         <!-- Signup Box -->
         <div class="box hidden" id="signupBox">
             <div class="text-center mb-6">
-                <img src="https://upload.wikimedia.org/wikipedia/it/4/49/Windows_Live_Messenger_logo.png" alt="WLM Logo" class="w-36 mx-auto mb-2">
+                <div class="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 flex items-center justify-center shadow" aria-hidden="true"><i class="fas fa-comments text-white text-3xl"></i></div>
                 <h1 class="text-xl font-bold text-gray-800">회원가입</h1>
-                <p class="text-xs text-gray-500 mt-1">새 WLM 계정을 생성합니다</p>
+                <p class="text-xs text-gray-500 mt-1">새 OpenCard 계정을 만듭니다</p>
             </div>
             <div class="space-y-3">
                 <div>
@@ -85,7 +88,7 @@
         <header class="flex justify-between items-center p-3 bg-gradient-to-r from-blue-600 to-sky-500 text-white px-6">
             <div class="flex items-center space-x-3">
                 <i class="fas fa-comments text-2xl"></i>
-                <h1 class="text-lg font-bold tracking-wide">WLM Messenger</h1>
+                <h1 class="text-lg font-bold tracking-wide">OpenCard Message</h1>
             </div>
             
             <div class="flex items-center space-x-4">
@@ -243,6 +246,95 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
 
+        // ---- Notifications & friendly Firebase errors ----
+        const ERROR_MESSAGES = {
+            // Auth
+            'auth/invalid-email': '이메일 형식이 올바르지 않아요. 예: example@email.com',
+            'auth/missing-email': '이메일을 입력해 주세요.',
+            'auth/missing-password': '비밀번호를 입력해 주세요.',
+            'auth/user-not-found': '이메일 또는 비밀번호가 올바르지 않아요.',
+            'auth/wrong-password': '이메일 또는 비밀번호가 올바르지 않아요.',
+            'auth/invalid-credential': '이메일 또는 비밀번호가 올바르지 않아요.',
+            'auth/invalid-login-credentials': '이메일 또는 비밀번호가 올바르지 않아요.',
+            'auth/email-already-in-use': '이미 가입된 이메일이에요. 로그인해 주세요.',
+            'auth/weak-password': '비밀번호가 너무 짧거나 쉬워요. 더 길고 복잡하게 만들어 주세요.',
+            'auth/too-many-requests': '시도 횟수가 너무 많아요. 잠시 후 다시 시도해 주세요.',
+            'auth/user-disabled': '사용이 중지된 계정이에요.',
+            'auth/network-request-failed': '네트워크에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.',
+            'auth/operation-not-allowed': '이메일 로그인이 아직 켜져 있지 않아요. Firebase 콘솔의 Authentication에서 이메일/비밀번호를 사용 설정해 주세요.',
+            'auth/requires-recent-login': '보안을 위해 다시 로그인한 뒤 시도해 주세요.',
+            'auth/internal-error': '서버에서 문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
+            // Firestore
+            'permission-denied': '이 작업을 할 권한이 없어요. 로그인 상태나 Firestore 보안 규칙을 확인해 주세요.',
+            'unauthenticated': '로그인이 필요해요. 다시 로그인해 주세요.',
+            'unavailable': '서버에 연결할 수 없어요. 인터넷 연결을 확인하고 잠시 후 다시 시도해 주세요.',
+            'deadline-exceeded': '서버 응답이 너무 늦어요. 잠시 후 다시 시도해 주세요.',
+            'not-found': '요청한 데이터를 찾을 수 없어요.',
+            'already-exists': '이미 존재하는 데이터예요.',
+            'resource-exhausted': '사용량 한도를 넘었어요. 잠시 후 다시 시도해 주세요.',
+            'failed-precondition': '이 조회에는 Firestore 색인이 필요해요. 브라우저 콘솔(F12)의 링크로 색인을 만들어 주세요.',
+            'invalid-argument': '잘못된 값이 전달됐어요.',
+            'aborted': '동시에 여러 작업이 겹쳐 중단됐어요. 다시 시도해 주세요.',
+            'cancelled': '작업이 취소됐어요.',
+            'internal': '서버에서 문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
+            // Storage
+            'storage/unauthorized': '파일을 올릴 권한이 없어요. Storage 보안 규칙을 확인해 주세요.',
+            'storage/unauthenticated': '로그인이 필요해요. 다시 로그인해 주세요.',
+            'storage/canceled': '파일 업로드가 취소됐어요.',
+            'storage/quota-exceeded': '저장 공간이 가득 찼어요.',
+            'storage/retry-limit-exceeded': '업로드 시간이 너무 오래 걸려 중단됐어요. 네트워크를 확인하고 다시 시도해 주세요.',
+            'storage/object-not-found': '파일을 찾을 수 없어요.',
+            'storage/bucket-not-found': 'Storage 버킷을 찾을 수 없어요. Firebase 설정을 확인해 주세요.',
+            'storage/invalid-checksum': '파일이 올바르게 전송되지 않았어요. 다시 시도해 주세요.'
+        };
+
+        // Turns a Firebase error into a plain Korean sentence. `lead` is an optional first sentence (e.g. "로그인하지 못했어요.").
+        function friendlyError(err, lead = '') {
+            const raw = (err && err.code) ? String(err.code) : '';
+            const code = raw.replace(/^firestore\//, '');
+            let reason = ERROR_MESSAGES[raw] || ERROR_MESSAGES[code];
+            if (!reason) {
+                if (!navigator.onLine) reason = '인터넷에 연결되어 있지 않아요. 연결을 확인해 주세요.';
+                else reason = '알 수 없는 오류가 발생했어요. 잠시 후 다시 시도해 주세요.' + (raw ? ` (오류 코드: ${raw})` : '');
+            }
+            console.error('[OpenCard Message]', lead, err);
+            return lead ? `${lead} ${reason}` : reason;
+        }
+
+        function notify(message, type = 'info') {
+            const host = document.getElementById('toastHost');
+            if (!host) return;
+            // Skip duplicates that are already on screen
+            for (const el of host.children) { if (el.dataset.msg === message) return; }
+
+            const styles = {
+                error: 'bg-red-50 text-red-800 border-red-200',
+                success: 'bg-green-50 text-green-800 border-green-200',
+                info: 'bg-white text-gray-800 border-gray-200'
+            };
+            const icons = { error: 'fa-circle-exclamation', success: 'fa-circle-check', info: 'fa-circle-info' };
+
+            const el = document.createElement('div');
+            el.dataset.msg = message;
+            el.className = `pointer-events-auto w-full flex items-start gap-2 px-4 py-3 rounded-xl border shadow-lg text-sm ${styles[type] || styles.info}`;
+            const icon = document.createElement('i');
+            icon.className = `fas ${icons[type] || icons.info} mt-0.5`;
+            const text = document.createElement('span');
+            text.className = 'flex-1 break-words';
+            text.textContent = message;
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.setAttribute('aria-label', '닫기');
+            close.className = 'opacity-60 hover:opacity-100';
+            close.innerHTML = '<i class="fas fa-xmark"></i>';
+            el.append(icon, text, close);
+            host.appendChild(el);
+
+            const remove = () => el.remove();
+            close.addEventListener('click', remove);
+            setTimeout(remove, type === 'error' ? 7000 : 4000);
+        }
+
         // Global State
         let currentUser = null;
         let unsubscribeListeners = [];
@@ -261,12 +353,12 @@
         document.getElementById("loginBtn").addEventListener("click", async () => {
             const email = document.getElementById("loginEmail").value.trim();
             const password = document.getElementById("loginPassword").value.trim();
-            if(!email || !password) return alert("이메일과 비밀번호를 모두 입력해주세요.");
+            if(!email || !password) return notify("이메일과 비밀번호를 모두 입력해 주세요.", "error");
 
             try { 
                 await signInWithEmailAndPassword(auth, email, password); 
             } catch(e) { 
-                alert("로그인 실패: " + e.message); 
+                notify(friendlyError(e, "로그인하지 못했어요."), "error"); 
             }
         });
 
@@ -276,8 +368,8 @@
             const password = document.getElementById("signupPassword").value.trim();
             const confirm = document.getElementById("signupConfirm").value.trim();
             
-            if(!email || !password) return alert("모든 항목을 입력해주세요.");
-            if(password !== confirm) return alert("비밀번호가 일치하지 않습니다.");
+            if(!email || !password) return notify("모든 항목을 입력해 주세요.", "error");
+            if(password !== confirm) return notify("비밀번호가 서로 달라요. 다시 확인해 주세요.", "error");
             
             try {
                 const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -285,13 +377,13 @@
                     email: email,
                     profilePicUrl: `https://placehold.co/100/0078d7/ffffff?text=${email.charAt(0).toUpperCase()}`,
                     friends: [],
-                    personalMessage: '안녕하세요! WLM 메신저입니다.'
+                    personalMessage: '안녕하세요! OpenCard Message입니다.'
                 });
-                alert("회원가입이 완료되었습니다. 로그인해주세요.");
+                notify("회원가입이 완료됐어요. 로그인해 주세요.", "success");
                 document.getElementById('signupBox').classList.add('hidden');
                 document.getElementById('loginBox').classList.remove('hidden');
             } catch(e) { 
-                alert("회원가입 실패: " + e.message); 
+                notify(friendlyError(e, "회원가입하지 못했어요."), "error"); 
             }
         });
 
@@ -329,7 +421,7 @@
                     
                     listenForFriends(userData.friends || []);
                 }
-            });
+            }, (err) => notify(friendlyError(err, "내 정보를 불러오지 못했어요."), "error"));
             unsubscribeListeners.push(unsubUser);
         }
 
@@ -368,7 +460,7 @@
 
             document.getElementById('logoutBtn').addEventListener('click', async () => {
                 try { await signOut(auth); } 
-                catch(error) { console.error("Logout error", error); }
+                catch(error) { notify(friendlyError(error, "로그아웃하지 못했어요."), "error"); }
             });
 
             document.addEventListener('click', () => dropdown.classList.add('hidden'));
@@ -378,15 +470,15 @@
         function setupChat() {
             document.getElementById('addFriendBtn').addEventListener('click', async () => {
                 const friendEmail = document.getElementById('addFriendEmail').value.trim();
-                if (!friendEmail) return alert("친구의 이메일을 입력하세요.");
-                if (friendEmail === currentUser.email) return alert("자기 자신은 친구로 추가할 수 없습니다.");
+                if (!friendEmail) return notify("친구의 이메일을 입력해 주세요.", "error");
+                if (friendEmail === currentUser.email) return notify("내 계정은 친구로 추가할 수 없어요.", "error");
 
                 try {
                     const q = query(collection(db, "users"), where("email", "==", friendEmail));
                     const querySnapshot = await getDocs(q);
 
                     if (querySnapshot.empty) {
-                        alert("해당 이메일을 가진 사용자를 찾을 수 없습니다.");
+                        notify("이 이메일로 가입한 사용자를 찾을 수 없어요. 이메일을 다시 확인해 주세요.", "error");
                     } else {
                         const friendDoc = querySnapshot.docs[0];
                         const userDocRef = doc(db, "users", currentUser.uid);
@@ -394,12 +486,11 @@
                         await updateDoc(userDocRef, { friends: arrayUnion(friendDoc.id) });
                         await updateDoc(doc(db, "users", friendDoc.id), { friends: arrayUnion(currentUser.uid) });
                         
-                        alert("친구가 성공적으로 추가되었습니다!");
+                        notify("친구를 추가했어요!", "success");
                         document.getElementById('addFriendEmail').value = '';
                     }
                 } catch(err) {
-                    console.error("Add friend error", err);
-                    alert("친구 추가 중 오류가 발생했습니다.");
+                    notify(friendlyError(err, "친구를 추가하지 못했어요."), "error");
                 }
             });
         }
@@ -427,7 +518,7 @@
                     friendEl.addEventListener('click', () => openChat(docSnap.id, friend));
                     friendsListEl.appendChild(friendEl);
                 });
-            });
+            }, (err) => notify(friendlyError(err, "친구 목록을 불러오지 못했어요."), "error"));
             unsubscribeListeners.push(unsubFriends);
         }
 
@@ -467,12 +558,13 @@
             const chatInput = newChatWindow.querySelector('.chat-input');
             const sendBtn = newChatWindow.querySelector('.send-msg-btn');
 
-            const handleSend = () => {
+            const handleSend = async () => {
                 const text = chatInput.value.trim();
-                if (text) {
-                    sendMessage(chatId, text);
-                    chatInput.value = '';
-                }
+                if (!text) return;
+                chatInput.value = '';
+                const ok = await sendMessage(chatId, text);
+                // Put the text back so it isn't lost if sending failed
+                if (!ok && !chatInput.value) chatInput.value = text;
             };
 
             sendBtn.addEventListener('click', handleSend);
@@ -491,19 +583,25 @@
                 snapshot.forEach((docSnap) => {
                     displayMessage(messagesContainer, docSnap.data());
                 });
-            });
+            }, (err) => notify(friendlyError(err, "대화 내용을 불러오지 못했어요."), "error"));
             unsubscribeListeners.push(unsubMessages);
 
             chatContainer.appendChild(newChatWindow);
         }
 
         async function sendMessage(chatId, content, isNudge = false) {
-            await addDoc(collection(db, `chats/${chatId}/messages`), {
-                senderId: currentUser.uid,
-                content: content,
-                isNudge: isNudge,
-                timestamp: serverTimestamp()
-            });
+            try {
+                await addDoc(collection(db, `chats/${chatId}/messages`), {
+                    senderId: currentUser.uid,
+                    content: content,
+                    isNudge: isNudge,
+                    timestamp: serverTimestamp()
+                });
+                return true;
+            } catch (err) {
+                notify(friendlyError(err, "메시지를 보내지 못했어요."), "error");
+                return false;
+            }
         }
 
         function displayMessage(container, message) {
@@ -537,7 +635,7 @@
                     document.getElementById('profileEditPic').src = userData.profilePicUrl;
                     document.getElementById('profilePersonalMessage').value = userData.personalMessage || '';
                 }
-            });
+            }, (err) => notify(friendlyError(err, "프로필을 불러오지 못했어요."), "error"));
             unsubscribeListeners.push(unsub);
 
             document.getElementById('saveProfileBtn').addEventListener('click', async () => {
@@ -562,11 +660,10 @@
                     if (downloadURL) updateData.profilePicUrl = downloadURL;
 
                     await updateDoc(userDocRef, updateData);
-                    alert('프로필이 성공적으로 변경되었습니다.');
+                    notify('프로필을 저장했어요.', 'success');
                     document.getElementById('profilePicInput').value = '';
                 } catch(error) { 
-                    console.error("Profile save error", error); 
-                    alert("프로필 저장 중 오류 발생");
+                    notify(friendlyError(error, "프로필을 저장하지 못했어요."), "error");
                 } finally { 
                     btn.disabled = false; 
                     btn.textContent = '설정 저장'; 
